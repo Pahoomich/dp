@@ -1,7 +1,7 @@
 program dp1
 implicit real*8 (a-h,o-z)
 external force
-common/mu/amu/tru/lgcl/kk/Kcounter(5)/n/nv
+common/mu/amu/tru/lgcl/kk/Kcounter(5)
 dimension x(14)
 logical start,lgcl,test
 character(1) :: choice
@@ -90,8 +90,8 @@ character(1) :: choice
     
     subroutine force(tm,x,f)
     implicit real*8(a-h,o-z)
-    dimension x(14),f(14),VecOfVar_tion(6)
-    common/mu/amu/tru/lgcl/n/nv
+    dimension x(14),f(14)
+    common/mu/amu/tru/lgcl
         !подсчет правых частей основных уравнений
         r1 = r1_res(x(1),x(2),x(3))
         r2 = r2_res(x(1),x(2),x(3))
@@ -104,39 +104,27 @@ character(1) :: choice
         
         !условие на подсчет вариации
         if (lgcl) then
-            !вычисление вектора вариации
-            call CalcVar_tion(x,r1,r2,VecOfVar_tion,f)
             !вычисление нек-х общих членов выражений вариации
             call CoefOfVar_tion(x(1),r1,r2,A,B,D,E,ff,G)
             !подсчет правых частей ур-й вариаций
-            f(7) = VecOfVar_tion(4)
-            f(8) = VecOfVar_tion(5)
-            f(9) = VecOfVar_tion(6)
-            f(10) = ff*VecOfVar_tion(1) + G*(x(2)*VecOfVar_tion(2) + x(3)*VecOfVar_tion(3)) + 2.d0*VecOfVar_tion(5)
-            f(11) = (D + E*x(2)**2)*VecOfVar_tion(2) + E*x(2)*x(3)*VecOfVar_tion(3) + G*x(2)*VecOfVar_tion(1) - 2.d0*VecOfVar_tion(4)
-            f(12) = (D - 1.d0 + E*x(3)**2)*VecOfVar_tion(3) + E*x(2)*x(3)*VecOfVar_tion(2) + G*x(3)*VecOfVar_tion(1)
+            f(7) = x(10)
+            f(8) = x(11)
+            f(9) = x(12)
+            f(10) = ff*x(7) + G*(x(2)*x(8) + x(3)*x(9)) + 2.d0*x(11)
+            f(11) = (D + E*x(2)**2)*x(8) + E*x(2)*x(3)*x(9) + G*x(2)*x(7) - 2.d0*x(10)
+            f(12) = (D - 1.d0 + E*x(3)**2)*x(9) + E*x(2)*x(3)*x(8) + G*x(3)*x(7)
             !подсчет компанент дл¤ индикатора
-            !SqVar_ionRate = 0.d0
-            !Prod_D_F = 0.d0
-            !SqFRate = 0.d0
-            !do i = 1,nv
-                !SqVar_ionRate = SqVar_ionRate + VecOfVar_tion(i)**2
-                !Prod_D_F = Prod_D_F + VecOfVar_tion(i)*f(i)
-                !SqFRate = SqFRate + f(i)**2
-            !enddo
-            
+           
             SqVar_ionRate = 0.d0
             Prod_D_F = 0.d0
             SqFRate = 0.d0
             do i = 1,6
-                SqVar_ionRate = SqVar_ionRate +  VecOfVar_tion(i)**2 
-                Prod_D_F = Prod_D_F + VecOfVar_tion(i)*f(i)
-            enddo
-            do i = 1,nv
-                SqFRate = SqFRate + f(i)**2        
+                SqVar_ionRate = SqVar_ionRate +  x(i + 6)**2 
+                Prod_D_F = Prod_D_F + x(i + 6)*f(i)
+                SqFRate = SqFRate + f(i)**2
             enddo
             !диф ур-¤ дл¤ индикатора хаоса
-            f(13) = dlog(dsqrt((SqVar_ionRate - Prod_D_F**2)/SqFRate))
+            f(13) = dlog(dsqrt(SqVar_ionRate - Prod_D_F**2/SqFRate))
             if (tm == 0.d0) then
                 f(14) = 0.d0
             else
@@ -243,9 +231,9 @@ character(1) :: choice
     return
     end
     
-    subroutine CalcVar_tion(x,r1,r2,CalcOfVar_tionVec,f)
+    subroutine CalcVar_tion(x,r1,r2)
     implicit real*8 (a-h,o-z)
-    dimension x(14),CalcOfVar_tionVec(6),f(14)
+    dimension x(14)
     common/mu/amu
         
         DifC_DifX = 2.d0*(x(1) - (1.d0 - amu)*(x(1) + amu)/r1**3 - amu*(x(1) - 1.d0 + amu)/r2**3)
@@ -255,17 +243,16 @@ character(1) :: choice
         DifC_DifYp = - 2.d0*x(5)
         DifC_DifZp = - 2.d0*x(6)
         
-        
-        pruv1 = DifC_DifX*f(1) + DifC_DifY*f(2) + DifC_DifZ*f(3) + DifC_DifXp*f(4) + DifC_DifYp*f(5) + DifC_DifZp*f(6)
+        !pruv1 = DifC_DifX*f(1) + DifC_DifY*f(2) + DifC_DifZ*f(3) + DifC_DifXp*f(4) + DifC_DifYp*f(5) + DifC_DifZp*f(6)
     
         GradNorm = dsqrt(DifC_DifX**2 + DifC_DifY**2 + DifC_DifZ**2 + DifC_DifXp**2 + DifC_DifYp**2 + DifC_DifZp**2)
     
-        CalcOfVar_tionVec(1) = DifC_DifX/GradNorm
-        CalcOfVar_tionVec(2) = DifC_DifY/GradNorm
-        CalcOfVar_tionVec(3) = DifC_DifZ/GradNorm
-        CalcOfVar_tionVec(4) = DifC_DifXp/GradNorm
-        CalcOfVar_tionVec(5) = DifC_DifYp/GradNorm
-        CalcOfVar_tionVec(6) = DifC_DifZp/GradNorm
+        x(7) = DifC_DifX/GradNorm
+        x(8) = DifC_DifY/GradNorm
+        x(9) = DifC_DifZ/GradNorm
+        x(10) = DifC_DifXp/GradNorm
+        x(11) = DifC_DifYp/GradNorm
+        x(12) = DifC_DifZp/GradNorm
     return
     end
     
@@ -284,7 +271,7 @@ character(1) :: choice
     
     subroutine xinit1(xnach,c0,AnglI,xinit)
     implicit real*8 (a-h,o-z)
-    common/mu/amu
+    common/mu/amu/tru/lgcl
     dimension xinit(14)
         xinit(1) = xnach
         xinit(2) = 0.d0
@@ -293,6 +280,11 @@ character(1) :: choice
         Vstr = dsqrt(2.d0*Sigm(xinit(1),xinit(2),xinit(3)) - c0)
         xinit(5) = Vstr*dcos(AnglI)
         xinit(6) = Vstr*dsin(AnglI)
+        if (lgcl) then
+            r1 = r1_res(xinit(1),xinit(2),xinit(3))
+            r2 = r2_res(xinit(1),xinit(2),xinit(3))
+            call CalcVar_tion(xinit,r1,r2)
+        endif
     return
     end
     
