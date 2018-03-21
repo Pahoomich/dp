@@ -44,7 +44,7 @@ character(1) :: choice
     open(333, file = 'The orbit is ejected into the outer sphere by L1.dat')
     open(444, file = 'clash with Charon.dat')
     open(555, file = 'Orbit complete integration.dat')
-
+   
     !основной цикл по посто§нной §коби
     do while (cinit <= cfin)
         write(*,*) 'c = ',cinit,' : '
@@ -73,6 +73,7 @@ character(1) :: choice
                 enddo
                 !расчет значени§ функции устойчивости по Тиллу, индикатора хаоса
                 call ValuesOfIndicators(x,tm,C_cr,Omegno,FuncHill)
+                !вывод данных в файлы
                 call PrintInFile(x,KeyValue,tm,Omegno,FuncHill,cinit,xnach1)
             endif
             xnach1 = xnach1 + delx
@@ -199,7 +200,7 @@ character(1) :: choice
     CHARACTER(LEN=63) :: FMT = '(F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X)'
     !CHARACTER(LEN=30) :: FMT = "7(F20.16,3X)"
     dimension x(14)
-        CJ = 2.d0*Sigm(x(1),x(2),x(3)) - x(4) - x(5) - x(6)
+        CJ = 2.d0*Sigm(x(1),x(2),x(3)) - x(4)**2 - x(5)**2 - x(6)**2
         deltC = (CJ - cinit)/CJ   
         
         select case (KeyValue)
@@ -243,8 +244,6 @@ character(1) :: choice
         DifC_DifYp = - 2.d0*x(5)
         DifC_DifZp = - 2.d0*x(6)
         
-        !pruv1 = DifC_DifX*f(1) + DifC_DifY*f(2) + DifC_DifZ*f(3) + DifC_DifXp*f(4) + DifC_DifYp*f(5) + DifC_DifZp*f(6)
-    
         GradNorm = dsqrt(DifC_DifX**2 + DifC_DifY**2 + DifC_DifZ**2 + DifC_DifXp**2 + DifC_DifYp**2 + DifC_DifZp**2)
     
         x(7) = DifC_DifX/GradNorm
