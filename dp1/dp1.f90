@@ -61,7 +61,7 @@ character(1) :: choice
                 start = .true.
                 !вложенный цикл по времени
                 test = .true.
-                do while(test)   
+                do while(test)
                     if (tm + tp > tf) then
                         tp = tf - tm
                         call rada15(tm,x,nv,tp,ss,ni,ns,nf,force,start)
@@ -71,6 +71,7 @@ character(1) :: choice
                     !проверка всех четырех условий
                     call VerificationOfConditions(x,tm,tf,eps,RChinConvUnits,x_L1,x_L2,x_L3,y_L4,test,KeyValue)
                 enddo
+                
                 !расчет значени§ функции устойчивости по Тиллу, индикатора хаоса
                 call ValuesOfIndicators(x,tm,C_cr,Omegno,FuncHill)
                 !вывод данных в файлы
@@ -114,8 +115,8 @@ character(1) :: choice
             f(10) = ff*x(7) + G*(x(2)*x(8) + x(3)*x(9)) + 2.d0*x(11)
             f(11) = (D + E*x(2)**2)*x(8) + E*x(2)*x(3)*x(9) + G*x(2)*x(7) - 2.d0*x(10)
             f(12) = (D - 1.d0 + E*x(3)**2)*x(9) + E*x(2)*x(3)*x(8) + G*x(3)*x(7)
+            
             !подсчет компанент дл§ индикатора
-           
             SqVar_ionRate = 0.d0
             Prod_D_F = 0.d0
             SqFRate = 0.d0
@@ -124,6 +125,7 @@ character(1) :: choice
                 Prod_D_F = Prod_D_F + x(i + 6)*f(i)
                 SqFRate = SqFRate + f(i)**2
             enddo
+            
             !диф ур-§ дл§ индикатора хаоса
             f(13) = dlog(dsqrt(SqVar_ionRate - Prod_D_F**2/SqFRate))
             if (tm == 0.d0) then
