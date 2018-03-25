@@ -1,64 +1,66 @@
 program dp1
 implicit real*8 (a-h,o-z)
 external force
-common/mu/amu/tru/lgcl/kk/Kcounter(5)
+common/mu/amu/tru/lgcl/kk/Kcounter(5)/eps/eps
 dimension x(14)
 logical start,lgcl,test
 character(1) :: choice
-    !считаем из файла начальные услови¤
+data eps/2.220446049250313d-16/
+    !считаем из файла начальные условия
     open(100,file = "1.txt")
     read(100,*) xnach, xkonza, delx, cinit, cfin, delc, nv, ss, ni, t0, tp0, tf, Gm1, Gm2, P1P2, RCh
     close(100)
     
-    !высчитаем ню 
+    !вычислим мю 
     amu = Gm2/(Gm1 + Gm2)
     !зададим значение угла наклона
     AnglI = 0.d0
     RChinConvUnits = RCh/P1P2
-    C_cr = 0.3620423879030583d0
+    C_cr = 0.3620423879030583d0 !вычисить здесь
     
-    !нек-е координаты точек равновеси¤(Ћагранджа)
-    x_L1 = 0.5929868613955974d0
-    x_L2 = 1.262525159065689d0
-    x_L3 = -1.045151336842185d0
-    y_L4 = 0.8660254037844386d0
+    !нек-е координаты точек равновесия(Лагранджа)
+    !x_L1 = 0.5929868613955974d0
+    !x_L2 = 1.262525159065689d0
+    !x_L3 = -1.045151336842185d0
+    !y_L4 = 0.8660254037844386d0
 
     !посчитаем машинный эпсилон
-    eps = 1.d0
-    do while (eps/2.d0 + 1.d0 > 1.d0)
-        eps = eps/2.d0
-    enddo
-    write(*,*) 'computer epsilon:', eps 
+    !eps = 1.d0
+    !do while (eps/2.d0 + 1.d0 > 1.d0)
+    !    eps = eps/2.d0
+    !enddo
+    !write(*,*) 'computer epsilon:', eps 
     
-    !блок выбора типа решени¤
+    !блок выбора типа решения
     write(*,*) 'select count with or without variation Y/N'
     read(*,*) choice
     if (choice == 'Y' .or. choice == 'y') then 
         lgcl = .true.
-        nv = 14
+        !nv = 14
     endif
     
     Kcounter = 0
     open(111, file = 'The orbit is ejected into the Pluto sphere through L1.dat')
     open(222, file = 'the orbit is ejected into the outer sphere by L2.dat')
     open(333, file = 'The orbit is ejected into the outer sphere by L1.dat')
-    open(444, file = 'clash with Charon.dat')
+    open(444, file = 'collision with Charon.dat')
     open(555, file = 'Orbit complete integration.dat')
    
-    !основной цикл по посто¤нной ¤коби
+    !основной цикл по постоянной якоби
     do while (cinit <= cfin)
         write(*,*) 'c = ',cinit,' : '
         xnach1 = xnach
         !основной цикл по оси х
         do while (xnach1 <= xkonza)
-            !проверим на допустимость движени¤
+            !проверим на допустимость движения
             if (2.d0*Sigm(xnach1,0.d0,0.d0) - cinit >= 0.d0) then
                 !инициализаци¤ начального вектора х
-                x = 0.d0
-                call xinit1(xnach1,cinit,AnglI,x)
+                !x = 0.d0
+                call xinit1(xnach1,cinit,AnglI,x,nv)
                 tm = t0
                 tp = tp0
                 start = .true.
+                DeltCMax = 0.d0
                 !вложенный цикл по времени
                 test = .true.
                 do while(test)
@@ -69,13 +71,13 @@ character(1) :: choice
                         call rada15(tm,x,nv,tp,ss,ni,ns,nf,force,start)
                     endif
                     !проверка всех четырех условий
-                    call VerificationOfConditions(x,tm,tf,eps,RChinConvUnits,x_L1,x_L2,x_L3,y_L4,test,KeyValue)
+                    call VerificationOfConditions(x,tm,tf,RChinConvUnits,test,KeyValue,DeltCMax,cinit)
                 enddo
                 
-                !расчет значени¤ функции устойчивости по ’иллу, индикатора хаоса
+                !вычисление функции устойчивости по Хиллу и OMEGNO 
                 call ValuesOfIndicators(x,tm,C_cr,Omegno,FuncHill)
                 !вывод данных в файлы
-                call PrintInFile(x,KeyValue,tm,Omegno,FuncHill,cinit,xnach1)
+                call PrintInFile(x,KeyValue,tm,Omegno,FuncHill,cinit,DeltCMax,xnach1)
             endif
             xnach1 = xnach1 + delx
         enddo
@@ -93,22 +95,27 @@ character(1) :: choice
     subroutine force(tm,x,f)
     implicit real*8(a-h,o-z)
     dimension x(14),f(14)
-    common/mu/amu/tru/lgcl
-        !подсчет правых частей основных уравнений
-        r1 = r1_res(x(1),x(2),x(3))
-        r2 = r2_res(x(1),x(2),x(3))
+    common/mu/amu/tru/lgcl/eps/eps
+        !вычисление правых частей уравнений 
+        r1 = r1sq_res(x(1),x(2),x(3))
+        r2 = r2sq_res(x(1),x(2),x(3))
+        r11 = dsqrt(r1)
+        r21 = dsqrt(r2)
         f(1) = x(4)
         f(2) = x(5)
         f(3) = x(6)
-        f(4) = 2.d0*x(5) + x(1) - (1.d0 - amu)*(x(1) + amu)/r1**3 - amu*((x(1) - 1.d0 + amu)/r2**3)
-        f(5) = -2.d0*x(4) + x(2) - (1.d0 - amu)*x(2)/r1**3 - amu*(x(2)/r2**3)
-        f(6) = -(1.d0 - amu)*x(3)/r1**3 - amu*x(3)/r2**3
+        !f(4) = 2.d0*x(5) + x(1) - (1.d0 - amu)*(x(1) + amu)/r1**3 - amu*((x(1) - 1.d0 + amu)/r2**3)
+        f(4) = 2.d0*x(5) + x(1) - (1.d0 - amu)*(x(1) + amu)/r1/r11 - amu*((x(1) - 1.d0 + amu)/r2/r21)
+        !f(5) = -2.d0*x(4) + x(2) - (1.d0 - amu)*x(2)/r1**3 - amu*(x(2)/r2**3)
+        f(5) = -2.d0*x(4) + x(2) - (1.d0 - amu)*x(2)/r1/r11 - amu*(x(2)/r2/r21)
+        !f(6) = -(1.d0 - amu)*x(3)/r1**3 - amu*x(3)/r2**3
+        f(6) = -(1.d0 - amu)*x(3)/r1/r11 - amu*x(3)/r2/r21
         
-        !условие на подсчет вариации
+        !условие для вычисления правых частей дополнительных уравнений
         if (lgcl) then
-            !вычисление нек-х общих членов выражений вариации
+            !вычисление нек-х вспомогательных величин 
             call CoefOfVar_tion(x(1),r1,r2,A,B,D,E,ff,G)
-            !подсчет правых частей ур-й вариаций
+            !вычисление правых частей ур-й в вариациях
             f(7) = x(10)
             f(8) = x(11)
             f(9) = x(12)
@@ -116,7 +123,7 @@ character(1) :: choice
             f(11) = (D + E*x(2)**2)*x(8) + E*x(2)*x(3)*x(9) + G*x(2)*x(7) - 2.d0*x(10)
             f(12) = (D - 1.d0 + E*x(3)**2)*x(9) + E*x(2)*x(3)*x(8) + G*x(3)*x(7)
             
-            !подсчет компанент дл¤ индикатора
+            !вычисление вспомогательных величин для OMEGNO 
             SqVar_ionRate = 0.d0
             Prod_D_F = 0.d0
             SqFRate = 0.d0
@@ -126,48 +133,59 @@ character(1) :: choice
                 SqFRate = SqFRate + f(i)**2
             enddo
             
-            !диф ур-¤ дл¤ индикатора хаоса
-            f(13) = dlog(dsqrt(SqVar_ionRate - Prod_D_F**2/SqFRate))
+            !вычисление правых частей ур-й для OMEGNO
+            !f(13) = dlog(dsqrt(SqVar_ionRate - Prod_D_F**2/SqFRate))
+            Delta_ort = dsqrt(SqVar_ionRate - Prod_D_F**2/SqFRate)
+            if (Delta_ort < eps) Delta_ort = eps
+            f(13) = dlog(Delta_ort)
             if (tm == 0.d0) then
                 f(14) = 0.d0
             else
-                f(14) = f(13)/tm 
+                f(14) = x(13)/tm 
             endif
         endif
     return
     end
     
-    subroutine VerificationOfConditions(x,tm,tf,eps,RCh,x_L1,x_L2,x_L3,y_L4,test,KeyValue)
+    subroutine VerificationOfConditions(x,tm,tf,RCh,test,KeyValue,DeltCMax,cinit)
     implicit real*8 (a-h,o-z)
-    common/mu/amu/kk/Kcounter(5)
+    common/mu/amu/kk/Kcounter(5)/eps/eps
     dimension x(14)
     logical test
-        !проверим остаетс¤ ли орбита в сфере второго тела(’арона)
-        if (dabs(tm - tf) >= eps) then
+    data delt1/0.12d0/delt2/0.10d0/
+    data x_L1/0.5929868613955974d0/x_L2/1.262525159065689d0/x_L3/-1.045151336842185d0/y_L4/0.8660254037844386d0/
+        !Вычисление максимальной погрешности по С
+        CJ = 2.d0*Sigm(x(1),x(2),x(3)) - x(4)**2 - x(5)**2 - x(6)**2
+        DeltC = dabs((CJ - cinit)/CJ) 
+        if (DeltC >= DeltCMax) DeltCMax = DeltC
+        
+        !проверим остается ли орбита в сфере второго тела(Харона)
+        !if (dabs(tm - tf) >= eps) then
+        if (dabs(tm - tf) >= eps*dabs(tf)) then
             !подсчет радиусов
-            r1 = R1_res(x(1), x(2), x(3))
-            r2 = R2_res(x(1), x(2), x(3))
+            r1 = dsqrt(R1sq_res(x(1), x(2), x(3)))
+            r2 = dsqrt(R2sq_res(x(1), x(2), x(3)))
             !зададим нек-е пределы точности
-            delt1 = 0.12d0
-            delt2 = 0.10d0
+            !delt1 = 0.12d0
+            !delt2 = 0.10d0
             !посчитаем значение координаты по х дл¤ ѕлутона
             x_P1 = -amu
-            !орбита выбрасываетс¤ в сферу ѕлутона через L1
+            !орбита выбрасывается в сферу Плутона через L1
             if ((x(1) < x_L1 - delt1).and.(r1 <= dabs(x_L3 - x_P1))) then
                 KeyValue = 1
                 Kcounter(1) = Kcounter(1) + 1
                 test = .false.
-            !орбита выбрасываетс¤ во внешнию сферу через L2
+            !орбита выбрасывается во внешнию сферу через L2
             else if ((x(1) > x_L2 + delt2).or.(dsqrt(x(2)**2 + x(3)**2) > y_L4)) then
                 KeyValue = 2
                 Kcounter(2) = Kcounter(2) + 1
                 test = .false.
-            !орбита выбрасываетс¤ во внешнию сферу через L1
+            !орбита выбрасывается во внешнию сферу через L1
             else if ((x(1) < x_L1 - delt1).and.(r1 > dabs(x_L3 - x_P1))) then
                 KeyValue = 3
                 Kcounter(3) = Kcounter(3) + 1
                 test = .false.
-            !столкновение с ’ароном
+            !столкновение с Хароном
             else if (r2 <= RCh) then
                 KeyValue = 4
                 Kcounter(4) = Kcounter(4) + 1
@@ -183,54 +201,56 @@ character(1) :: choice
     
     subroutine ValuesOfIndicators(x,tm,C_cr,Omegno,FuncHill)
     implicit real*8 (a-h,o-z)
-    common/mu/amu
+    common/mu/amu/tru/lgcl
     dimension x(14)
-        !значение индикатора хаоса
-        Omegno = 2.d0*(x(13) - x(14))/tm
-        !значени¤ функции устойчивости по ’иллу
+        if (lgcl) then
+            !значение индикатора хаоса OMEGNO
+            Omegno = 2.d0*(x(13) - x(14))/tm
+        endif
+        !значение функции устойчивости по Хиллу
             !обобщенный потенциал равен:
             GenPotent = Sigm(x(1),x(2),x(3)) + amu*(1.d0 - amu)/2.d0
-            !обобщенное значение интеграа ¤коби
+            !значение обобщенного интеграла Якоби
             Gen_C = 2.d0*GenPotent - x(4)**2 - x(5)**2 - x(6)**2
-            !значение функции устойчивости по ’иллу
+            !значение функции устойчивости по Хиллу
             FuncHill = (Gen_C - C_cr)/C_cr
     return
     end
     
-    subroutine PrintInFile(x,KeyValue,tm,Omegno,FuncHill,cinit,xnach1)
+    subroutine PrintInFile(x,KeyValue,tm,Omegno,FuncHill,cinit,DeltCMax,xnach1)
     implicit real*8 (a-h,o-z)
     CHARACTER(LEN=63) :: FMT = '(F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X)'
     !CHARACTER(LEN=30) :: FMT = "7(F20.16,3X)"
     dimension x(14)
-        CJ = 2.d0*Sigm(x(1),x(2),x(3)) - x(4)**2 - x(5)**2 - x(6)**2
-        deltC = (CJ - cinit)/CJ   
+        !CJ = 2.d0*Sigm(x(1),x(2),x(3)) - x(4)**2 - x(5)**2 - x(6)**2
+        !deltC = (CJ - cinit)/CJ   
         
         select case (KeyValue)
         case (1)
-            write(111,FMT)tm,deltc,cinit,xnach1,omegno,funchill
+            write(111,FMT)tm,DeltCMax,xnach1,cinit,omegno,funchill
         case (2)
-            write(222,FMT)tm,deltc,cinit,xnach1,omegno,funchill
+            write(222,FMT)tm,DeltCMax,xnach1,cinit,omegno,funchill
         case (3)
-            write(333,FMT)tm,deltc,cinit,xnach1,omegno,funchill
+            write(333,FMT)tm,DeltCMax,xnach1,cinit,omegno,funchill
         case (4)
-            write(444,FMT)tm,deltc,cinit,xnach1,omegno,funchill
+            write(444,FMT)tm,DeltCMax,xnach1,cinit,omegno,funchill
         case (5)
-            write(555,FMT)tm,deltc,cinit,xnach1,omegno,funchill
+            write(555,FMT)tm,DeltCMax,xnach1,cinit,omegno,funchill
         end select
     return
     end
     
-    function R1_res(x, y, z)
+    function R1sq_res(x, y, z)
     implicit real*8 (a-h,o-z)    
     common/mu/amu
-        R1_res = dsqrt((x + amu)**2 + y**2 + z**2)
+        R1sq_res = (x + amu)**2 + y**2 + z**2
     return
     end
     
-    function R2_res (x, y, z)
+    function R2sq_res (x, y, z)
     implicit real*8 (a-h,o-z)        
     common/mu/amu
-        R2_res = dsqrt((x - 1.d0 + amu)**2 + y**2 + z**2)
+        R2sq_res = (x - 1.d0 + amu)**2 + y**2 + z**2
     return
     end
     
@@ -238,10 +258,15 @@ character(1) :: choice
     implicit real*8 (a-h,o-z)
     dimension x(14)
     common/mu/amu
-        
-        DifC_DifX = 2.d0*(x(1) - (1.d0 - amu)*(x(1) + amu)/r1**3 - amu*(x(1) - 1.d0 + amu)/r2**3)
-        DifC_DifY = 2.d0*(x(2) - (1.d0 - amu)*x(2)/r1**3 - amu*x(2)/r2**3)
-        DifC_DifZ = - 2.d0*((1.d0 - amu)*x(3)/r1*3 + amu*x(3)/r2**3)
+        r11 = dsqrt(r1)
+        r21 = dsqrt(r2)
+        Buff = 1.d0 - amu 
+        !DifC_DifX = 2.d0*(x(1) - (1.d0 - amu)*(x(1) + amu)/r1**3 - amu*(x(1) - 1.d0 + amu)/r2**3)
+        DifC_DifX = 2.d0*(x(1) - Buff*(x(1) + amu)/r1/r11 - amu*(x(1) - 1.d0 + amu)/r2/r21)
+        !DifC_DifY = 2.d0*(x(2) - (1.d0 - amu)*x(2)/r1**3 - amu*x(2)/r2**3)
+        DifC_DifY = 2.d0*(x(2) - Buff*x(2)/r1/r11 - amu*x(2)/r2/r21)
+        !DifC_DifZ = - 2.d0*((1.d0 - amu)*x(3)/r1**3 + amu*x(3)/r2**3)
+        DifC_DifZ = - 2.d0*(Buff*x(3)/r1/r11 + amu*x(3)/r2/r21)
         DifC_DifXp = - 2.d0*x(4)
         DifC_DifYp = - 2.d0*x(5)
         DifC_DifZp = - 2.d0*x(6)
@@ -254,23 +279,32 @@ character(1) :: choice
         x(10) = DifC_DifXp/GradNorm
         x(11) = DifC_DifYp/GradNorm
         x(12) = DifC_DifZp/GradNorm
+        x(13) = 0.d0
+        x(14) = 0.d0
     return
     end
     
     subroutine CoefOfVar_tion(x,r1,r2,A,B,D,E,F,G)
     implicit real*8 (a-h,o-z)
     common/mu/amu
-        A = 3.d0*(1.d0 - amu)/r1**5
-        B = 3.d0*amu/r2**5
-        D= 1.d0 - (1.d0 - amu)/(r1*r1*r1) - amu/(r2*r2*r2)
-        D = 1.d0 - (1.d0 - amu)/r1**3 - amu/r2**3
+        r11 = dsqrt(r1)
+        r21 = dsqrt(r2)
+        Buff = 1.d0 - amu
+        Buff1 = x + amu
+        Buff2 = x - 1.d0 + amu
+        !A = 3.d0*(1.d0 - amu)/r1**5
+        A = 3.d0*Buff/r1/r1/r11
+        !B = 3.d0*amu/r2**5
+        B = 3.d0*amu/r2/r2/r21
+        !D = 1.d0 - (1.d0 - amu)/r1**3 - amu/r2**3
+        D = 1.d0 - Buff/r1/r11 - amu/r2/r21
         E = A + B
-        F = D + A*(x + amu)**2 + B*(x - 1.d0 + amu)**2
-        G = A*(x + amu) + B*(x - 1.d0 + amu)
+        F = D + A*Buff1**2 + B*Buff2**2
+        G = A*Buff1 + B*Buff2
     return
     end
     
-    subroutine xinit1(xnach,c0,AnglI,xinit)
+    subroutine xinit1(xnach,c0,AnglI,xinit,nv)
     implicit real*8 (a-h,o-z)
     common/mu/amu/tru/lgcl
     dimension xinit(14)
@@ -282,9 +316,10 @@ character(1) :: choice
         xinit(5) = Vstr*dcos(AnglI)
         xinit(6) = Vstr*dsin(AnglI)
         if (lgcl) then
-            r1 = r1_res(xinit(1),xinit(2),xinit(3))
-            r2 = r2_res(xinit(1),xinit(2),xinit(3))
-            call CalcVar_tion(xinit,r1,r2)
+            r1_sqr = r1sq_res(xinit(1),xinit(2),xinit(3))
+            r2_sqr = r2sq_res(xinit(1),xinit(2),xinit(3))
+            call CalcVar_tion(xinit,r1_sqr,r2_sqr)
+            nv = 14
         endif
     return
     end
@@ -292,8 +327,8 @@ character(1) :: choice
     function Sigm (x,y,z)
     implicit real*8 (a-h,o-z)
     common/mu/amu
-        r1 = r1_res(x,y,z)
-        r2 = r2_res(x,y,z)
+        r1 = dsqrt(r1sq_res(x,y,z))
+        r2 = dsqrt(r2sq_res(x,y,z))
         Sigm = x**2/2.d0 + y**2/2.d0 + (1.d0 - amu)/r1 + amu/r2       
     return
     end
