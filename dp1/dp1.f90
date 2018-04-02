@@ -2,7 +2,7 @@ program dp1
 implicit real*8 (a-h,o-z)
 external force
 common/mu/amu/tru/lgcl/kk/Kcounter(5)/eps/eps
-dimension x(14)
+dimension x(14),xjbrdr(6)
 logical start,lgcl,test
 character(1) :: choice
 data eps/2.220446049250313d-16/
@@ -16,20 +16,22 @@ data eps/2.220446049250313d-16/
     !зададим значение угла наклона
     AnglI = 0.d0
     RChinConvUnits = RCh/P1P2
-    C_cr = 0.3620423879030583d0 !вычисить здесь
+    C_cr = 0.3620423879030583d1 !вычисить здесь
+      
+    !найдем границу запретной области (x0,C)
+    open(888, file = 'border of the restricted area.dat')
+    xjbrdr = 0.d0
+    xjbrdr(1) = xnach 
+    do while (xjbrdr(1) <= xkonza)
+        r1jbrdr = R1sq_res(xjbrdr(1),xjbrdr(2),xjbrdr(3))
+        r2jbrdr = R2sq_res(xjbrdr(1),xjbrdr(2),xjbrdr(3))
+        cjbrdr = xjbrdr(1)**2 + 2.d0*(1.d0 - amu)/dsqrt(r1jbrdr) + 2.d0*amu/dsqrt(r2jbrdr)
+        if (cjbrdr < 5.d0) write(888,*)xjbrdr(1),cjbrdr
+        xjbrdr(1) = xjbrdr(1) + 0.01d0
+    enddo
+    close(888)
     
-    !нек-е координаты точек равновесия(Лагранджа)
-    !x_L1 = 0.5929868613955974d0
-    !x_L2 = 1.262525159065689d0
-    !x_L3 = -1.045151336842185d0
-    !y_L4 = 0.8660254037844386d0
-
-    !посчитаем машинный эпсилон
-    !eps = 1.d0
-    !do while (eps/2.d0 + 1.d0 > 1.d0)
-    !    eps = eps/2.d0
-    !enddo
-    !write(*,*) 'computer epsilon:', eps 
+    
     
     !блок выбора типа решения
     write(*,*) 'select count with or without variation Y/N'
@@ -55,7 +57,6 @@ data eps/2.220446049250313d-16/
             !проверим на допустимость движения
             if (2.d0*Sigm(xnach1,0.d0,0.d0) - cinit >= 0.d0) then
                 !инициализаци¤ начального вектора х
-                !x = 0.d0
                 call xinit1(xnach1,cinit,AnglI,x,nv)
                 tm = t0
                 tp = tp0
@@ -104,11 +105,8 @@ data eps/2.220446049250313d-16/
         f(1) = x(4)
         f(2) = x(5)
         f(3) = x(6)
-        !f(4) = 2.d0*x(5) + x(1) - (1.d0 - amu)*(x(1) + amu)/r1**3 - amu*((x(1) - 1.d0 + amu)/r2**3)
         f(4) = 2.d0*x(5) + x(1) - (1.d0 - amu)*(x(1) + amu)/r1/r11 - amu*((x(1) - 1.d0 + amu)/r2/r21)
-        !f(5) = -2.d0*x(4) + x(2) - (1.d0 - amu)*x(2)/r1**3 - amu*(x(2)/r2**3)
         f(5) = -2.d0*x(4) + x(2) - (1.d0 - amu)*x(2)/r1/r11 - amu*(x(2)/r2/r21)
-        !f(6) = -(1.d0 - amu)*x(3)/r1**3 - amu*x(3)/r2**3
         f(6) = -(1.d0 - amu)*x(3)/r1/r11 - amu*x(3)/r2/r21
         
         !условие для вычисления правых частей дополнительных уравнений
@@ -134,7 +132,6 @@ data eps/2.220446049250313d-16/
             enddo
             
             !вычисление правых частей ур-й для OMEGNO
-            !f(13) = dlog(dsqrt(SqVar_ionRate - Prod_D_F**2/SqFRate))
             Delta_ort = dsqrt(SqVar_ionRate - Prod_D_F**2/SqFRate)
             if (Delta_ort < eps) Delta_ort = eps
             f(13) = dlog(Delta_ort)
@@ -160,15 +157,11 @@ data eps/2.220446049250313d-16/
         if (DeltC >= DeltCMax) DeltCMax = DeltC
         
         !проверим остается ли орбита в сфере второго тела(Харона)
-        !if (dabs(tm - tf) >= eps) then
         if (dabs(tm - tf) >= eps*dabs(tf)) then
             !подсчет радиусов
             r1 = dsqrt(R1sq_res(x(1), x(2), x(3)))
             r2 = dsqrt(R2sq_res(x(1), x(2), x(3)))
-            !зададим нек-е пределы точности
-            !delt1 = 0.12d0
-            !delt2 = 0.10d0
-            !посчитаем значение координаты по х дл¤ ѕлутона
+            !посчитаем значение координаты по х для Плутона
             x_P1 = -amu
             !орбита выбрасывается в сферу Плутона через L1
             if ((x(1) < x_L1 - delt1).and.(r1 <= dabs(x_L3 - x_P1))) then
@@ -220,10 +213,7 @@ data eps/2.220446049250313d-16/
     subroutine PrintInFile(x,KeyValue,tm,Omegno,FuncHill,cinit,DeltCMax,xnach1)
     implicit real*8 (a-h,o-z)
     CHARACTER(LEN=63) :: FMT = '(F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X,F24.16,3X)'
-    !CHARACTER(LEN=30) :: FMT = "7(F20.16,3X)"
-    dimension x(14)
-        !CJ = 2.d0*Sigm(x(1),x(2),x(3)) - x(4)**2 - x(5)**2 - x(6)**2
-        !deltC = (CJ - cinit)/CJ   
+    dimension x(14) 
         
         select case (KeyValue)
         case (1)
@@ -261,11 +251,8 @@ data eps/2.220446049250313d-16/
         r11 = dsqrt(r1)
         r21 = dsqrt(r2)
         Buff = 1.d0 - amu 
-        !DifC_DifX = 2.d0*(x(1) - (1.d0 - amu)*(x(1) + amu)/r1**3 - amu*(x(1) - 1.d0 + amu)/r2**3)
         DifC_DifX = 2.d0*(x(1) - Buff*(x(1) + amu)/r1/r11 - amu*(x(1) - 1.d0 + amu)/r2/r21)
-        !DifC_DifY = 2.d0*(x(2) - (1.d0 - amu)*x(2)/r1**3 - amu*x(2)/r2**3)
         DifC_DifY = 2.d0*(x(2) - Buff*x(2)/r1/r11 - amu*x(2)/r2/r21)
-        !DifC_DifZ = - 2.d0*((1.d0 - amu)*x(3)/r1**3 + amu*x(3)/r2**3)
         DifC_DifZ = - 2.d0*(Buff*x(3)/r1/r11 + amu*x(3)/r2/r21)
         DifC_DifXp = - 2.d0*x(4)
         DifC_DifYp = - 2.d0*x(5)
@@ -292,11 +279,8 @@ data eps/2.220446049250313d-16/
         Buff = 1.d0 - amu
         Buff1 = x + amu
         Buff2 = x - 1.d0 + amu
-        !A = 3.d0*(1.d0 - amu)/r1**5
         A = 3.d0*Buff/r1/r1/r11
-        !B = 3.d0*amu/r2**5
         B = 3.d0*amu/r2/r2/r21
-        !D = 1.d0 - (1.d0 - amu)/r1**3 - amu/r2**3
         D = 1.d0 - Buff/r1/r11 - amu/r2/r21
         E = A + B
         F = D + A*Buff1**2 + B*Buff2**2
